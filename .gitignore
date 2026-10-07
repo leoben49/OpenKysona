@@ -1,0 +1,6 @@
+node_modules
+/dist
+# Dev-only probe logs and personal device backups never go in the repo
+/.devlog
+/backups
+*.bin

@@ -1,0 +1,23 @@
+{
+  "name": "m600-control",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lightweight, offline WebHID configurator for the Kysona M600 V2 mouse",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/w3c-web-hid": "^1.0.7",
+    "svelte": "^5.57.2",
+    "svelte-check": "^4.7.6",
+    "typescript": "^6.0.0",
+    "vite": "^8.3.3",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}
