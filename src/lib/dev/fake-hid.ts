@@ -1,5 +1,6 @@
 import { checksum, Command, PACKET_LEN, REPORT_ID } from '../protocol/packet';
 import { FLASH_SIZE } from '../protocol/device';
+import { M600_SETTINGS } from '../protocol/fixtures';
 
 /**
  * Dev only: an in-memory HIDDevice that speaks the mouse protocol, so the UI
@@ -7,8 +8,7 @@ import { FLASH_SIZE } from '../protocol/device';
  */
 export async function createFakeHid(): Promise<HIDDevice> {
   const flash = new Uint8Array(FLASH_SIZE).fill(0xff);
-  const res = await fetch('/backups/flash-original-2026-10-07.bin').catch(() => null);
-  if (res?.ok) flash.set(new Uint8Array(await res.arrayBuffer()).subarray(0, FLASH_SIZE));
+  flash.set(M600_SETTINGS);
 
   const target = new EventTarget();
   const reply = (p: Uint8Array) => {

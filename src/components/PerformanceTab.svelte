@@ -250,7 +250,8 @@
     margin-right: auto;
   }
   .value input {
-    width: 7ch;
+    field-sizing: content;
+    min-width: 3ch;
     padding: 2px 6px;
     margin-left: -6px;
     border: 1px solid transparent;
