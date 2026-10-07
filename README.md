@@ -5,7 +5,7 @@ It runs in your browser, works offline, and installs nothing.
 
 ![OpenKysona showing DPI stages and polling rate](docs/screenshot.jpg)
 
-**[Open OpenKysona →](https://leoben49.github.io/openkysona/)**
+**[Open OpenKysona →](https://leoben49.github.io/OpenKysona/)**
 
 ## Why
 
@@ -30,13 +30,13 @@ page. Nothing runs in the background and nothing starts with Windows.
 
 ## Using it
 
-1. Open **[leoben49.github.io/openkysona](https://leoben49.github.io/openkysona/)** in
+1. Open **[leoben49.github.io/OpenKysona](https://leoben49.github.io/OpenKysona/)** in
    Chrome, Edge, Brave or another Chromium browser on desktop. Firefox and Safari
    don't support WebHID.
 2. Plug in the 2.4 GHz receiver or the USB cable and click **Connect mouse**.
 
 To use it fully offline, download `openkysona.html` from the
-[latest release](https://github.com/leoben49/openkysona/releases/latest) and open
+[latest release](https://github.com/leoben49/OpenKysona/releases/latest) and open
 it from disk. It's the same page in a single self-contained file.
 
 **Connections:** settings can be changed over the 2.4 GHz receiver or the USB
