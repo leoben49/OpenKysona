@@ -58,6 +58,19 @@ export class Mouse {
     await this.hid.close();
   }
 
+  /**
+   * Subscribes to unsolicited status reports (0x0A), sent when the mouse
+   * changes something by itself. `flags` bits: 1 DPI, 2 polling rate,
+   * 4 config, 64 battery. Returns an unsubscribe function.
+   */
+  onStatus(handler: (flags: number) => void): () => void {
+    const listener = (e: HIDInputReportEvent) => {
+      if (e.reportId === REPORT_ID && e.data.getUint8(0) === Command.StatusChanged) handler(e.data.getUint8(5));
+    };
+    this.hid.addEventListener('inputreport', listener);
+    return () => this.hid.removeEventListener('inputreport', listener);
+  }
+
   /** Sends a request and resolves with the 16-byte response echoing the same command. */
   request(cmd: Command, addr = 0, len = 0, payload: ArrayLike<number> = []): Promise<Uint8Array> {
     const run = () =>

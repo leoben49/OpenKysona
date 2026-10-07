@@ -1,10 +1,14 @@
 import { FLASH_SIZE, Mouse } from '../protocol/device';
 import { hex } from '../protocol/packet';
+import { mouseState } from '../state/mouse.svelte';
+import { probe } from './probe';
 
 type Task =
   | { type: 'restore'; backup: string }
   | { type: 'longRange'; enabled: boolean }
-  | { type: 'snapshot'; label?: string };
+  | { type: 'snapshot'; label?: string }
+  | { type: 'state' }
+  | { type: 'probe' };
 
 /** Dev-only: runs one-shot tasks queued by the developer via .devlog/task.json. */
 export async function runTask(mouse: Mouse, task: Task, log: (entry: object) => void) {
@@ -30,6 +34,12 @@ export async function runTask(mouse: Mouse, task: Task, log: (entry: object) => 
         log({ step: 'longRange', ok: true, before, after: await mouse.longRange() });
         break;
       }
+      case 'state':
+        log({ step: 'state', ok: true, settings: mouseState.settings, battery: mouseState.battery, sync: mouseState.sync, error: mouseState.error });
+        break;
+      case 'probe':
+        await probe(mouse, log);
+        break;
       case 'snapshot':
         log({ step: 'snapshot', label: task.label ?? '(task)', value: hex(await mouse.readFlash(0, FLASH_SIZE)) });
         break;

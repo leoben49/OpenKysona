@@ -1,119 +1,120 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
-  import { FLASH_SIZE, Mouse } from './lib/protocol/device';
-  import { hex } from './lib/protocol/packet';
-  import { probe } from './lib/dev/probe';
-  import { runTask } from './lib/dev/tasks';
+  import { onMount } from 'svelte';
+  import { mouseState } from './lib/state/mouse.svelte';
+  import Header from './components/Header.svelte';
+  import ConnectScreen from './components/ConnectScreen.svelte';
+  import PerformanceTab from './components/PerformanceTab.svelte';
+  import SensorTab from './components/SensorTab.svelte';
+  import ButtonsTab from './components/ButtonsTab.svelte';
+  import BackupTab from './components/BackupTab.svelte';
 
-  let mouse = $state<Mouse | null>(null);
-  let lines = $state<string[]>([]);
-  const supported = 'hid' in navigator;
+  const m = mouseState;
+  const TABS = [
+    { id: 'performance', label: 'Performance', component: PerformanceTab },
+    { id: 'sensor', label: 'Sensor', component: SensorTab },
+    { id: 'buttons', label: 'Buttons', component: ButtonsTab },
+    { id: 'backup', label: 'Backup', component: BackupTab },
+  ] as const;
+  type TabId = (typeof TABS)[number]['id'];
 
-  function log(entry: object) {
-    const line = JSON.stringify({ t: new Date().toISOString(), ...entry });
-    lines.push(line.length > 300 ? line.slice(0, 300) + '…' : line);
-    if (import.meta.env.DEV) fetch('/__devlog', { method: 'POST', body: line });
-  }
+  const TAB_KEY = 'm600.tab';
+  let tab = $state<TabId>('performance');
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    if (TABS.some((t) => t.id === saved)) tab = saved as TabId;
+  } catch {}
 
-  async function run(m: Mouse) {
-    mouse = m;
-    await probe(m, log);
-    if (import.meta.env.DEV) pollTasks(m);
-  }
-
-  async function pollTasks(m: Mouse) {
-    while (alive && mouse === m) {
-      const res = await fetch('/__task').catch(() => null);
-      if (res?.status === 200) {
-        busy = true;
-        await runTask(m, await res.json(), log);
-        busy = false;
-      }
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
-
-  let label = $state('');
-  let busy = $state(false);
-
-  async function snapshot() {
-    if (!mouse || busy) return;
-    busy = true;
+  function select(id: TabId) {
+    tab = id;
     try {
-      const flash = await mouse.readFlash(0, FLASH_SIZE);
-      log({ step: 'snapshot', label, value: hex(flash) });
-      label = '';
-    } catch (e) {
-      log({ step: 'snapshot', label, error: String(e) });
-    } finally {
-      busy = false;
-    }
+      localStorage.setItem(TAB_KEY, id);
+    } catch {}
   }
 
-  async function connect() {
-    const m = await Mouse.request().catch((e) => (log({ step: 'request', error: String(e) }), null));
-    if (m) await run(m);
-  }
+  const Current = $derived(TABS.find((t) => t.id === tab)!.component);
 
-  let alive = true;
-  onDestroy(() => (alive = false));
-
-  onMount(async () => {
-    if (!supported) return;
-    const m = await Mouse.fromGranted();
-    if (m) await run(m);
+  onMount(() => {
+    void m.restore();
+    if (import.meta.env.DEV) void import('./lib/dev/devtools').then((d) => d.start());
   });
 </script>
 
-<main>
-  <h1>M600 probe</h1>
-  {#if !supported}
-    <p>This browser does not support WebHID. Use Edge, Chrome or Brave.</p>
-  {:else if !mouse}
-    <button onclick={connect}>Connect mouse</button>
+<div class="shell">
+  <Header />
+
+  {#if !m.mouse}
+    <ConnectScreen />
+  {:else if !m.settings}
+    <p class="loading muted">Reading settings…</p>
   {:else}
-    <p>Connected: {mouse.hid.productName} ({mouse.link})</p>
-    <form onsubmit={(e) => (e.preventDefault(), snapshot())}>
-      <input bind:value={label} placeholder="What did you just change?" size="40" />
-      <button disabled={busy}>{busy ? 'Reading…' : 'Snapshot'}</button>
-    </form>
+    <div class="tabs" role="tablist" aria-label="Sections">
+      {#each TABS as t (t.id)}
+        <button role="tab" aria-selected={tab === t.id} class:on={tab === t.id} onclick={() => select(t.id)}>{t.label}</button>
+      {/each}
+    </div>
+    {#if m.error && m.sync === 'error'}
+      <div class="banner" role="alert">Couldn’t save to the mouse: {m.error}. Settings were re-read from the device.</div>
+    {/if}
+    <main>
+      <Current />
+    </main>
   {/if}
-  <pre>{lines.join('\n')}</pre>
-</main>
+</div>
 
 <style>
-  :global(body) {
-    margin: 0;
-    background: #111;
-    color: #ddd;
-    font: 14px/1.5 system-ui, sans-serif;
+  .shell {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 24px 64px;
   }
-  main {
-    padding: 24px;
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin: 8px 0 20px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
   }
-  button {
-    font: inherit;
-    padding: 8px 16px;
-    border-radius: 8px;
+  .tabs button {
+    position: relative;
+    height: 40px;
+    padding: 0 14px;
     border: 0;
-    background: #ff4d00;
-    color: white;
-    cursor: pointer;
+    background: none;
+    color: var(--text-2);
+    font-weight: 500;
+    white-space: nowrap;
+    transition: color 0.15s;
   }
-  input {
-    font: inherit;
-    padding: 8px 12px;
-    border-radius: 8px;
-    border: 1px solid #444;
-    background: #1c1c1c;
-    color: inherit;
+  .tabs button:hover,
+  .tabs button.on {
+    color: var(--text);
   }
-  button:disabled {
-    opacity: 0.6;
+  .tabs button.on::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--accent);
   }
-  pre {
-    white-space: pre-wrap;
-    word-break: break-all;
-    font-size: 12px;
+  .loading {
+    text-align: center;
+    margin-top: 20vh;
+  }
+  .banner {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    background: rgb(255 69 58 / 0.1);
+    border: 1px solid rgb(255 69 58 / 0.3);
+    color: var(--bad);
+    font-size: 13px;
+  }
+  @media (max-width: 560px) {
+    .shell {
+      padding: 0 16px 48px;
+    }
   }
 </style>
