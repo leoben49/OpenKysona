@@ -16,6 +16,10 @@
     <button class="btn primary" onclick={() => m.connect()}>Connect via cable</button>
   </div>
   <p class="hint muted">Your browser asks once for permission to use the cable connection.</p>
+  <p class="bt muted">
+    <b>On Bluetooth?</b> The mouse doesn’t accept setting changes over Bluetooth, but everything you set here
+    still applies. Windows shows its battery level in Settings → Bluetooth &amp; devices.
+  </p>
 </div>
 
 <style>
@@ -78,5 +82,15 @@
   .hint {
     margin-top: 12px;
     font-size: 12px;
+  }
+  .bt {
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .bt b {
+    color: var(--text);
+    font-weight: 600;
   }
 </style>

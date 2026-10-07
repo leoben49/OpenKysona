@@ -4,14 +4,20 @@ The M600 V2 is built on a Compx reference design (mouse MCU CX52850E, receiver
 CX52650N, PixArt PAW3395 sensor). Its protocol is the same one documented by
 [m916proui](https://github.com/dongkid/m916proui/blob/main/SPEC.md) for the
 Redragon G49/M916 Pro, with the Kysona-specific differences listed here.
-Everything below was verified against a real M600 V2 over the 2.4 GHz receiver.
+Everything below was verified against a real M600 V2 over the 2.4 GHz receiver
+and the USB cable.
 
-## USB IDs
+## Connections
 
-| Device | VID:PID |
-|---|---|
-| Mouse (wired) | `3554:F57D` |
-| Receiver | `3554:F5D5` (also listed by the vendor driver: `F57C`, `F57E`, `F512`) |
+| Mode | VID:PID | Settings channel |
+|---|---|---|
+| USB cable | `3554:F57D` ("KSN M600 V2") | yes, same protocol, ~3 ms round trip |
+| 2.4 GHz receiver | `3554:F5D5` (vendor driver also lists `F57C`, `F57E`, `F512`) | yes |
+| Bluetooth LE | `25A7:FA6C` | **no**: only mouse, keyboard and consumer collections. Battery is exposed through the standard GATT Battery Service, which Windows shows in Bluetooth settings. |
+
+Over the receiver, command `0x03` reports whether the mouse is reachable; when the
+mouse is off or in another mode, the receiver still answers `0x02`/`0x03` but
+nothing else.
 
 ## Transport
 
@@ -34,7 +40,7 @@ Everything below was verified against a real M600 V2 over the 2.4 GHz receiver.
 | `0x08` | Read flash | ≤ 10 bytes per request |
 | `0x0E` | Get current config | response payload[0] = active profile |
 | `0x0F` | Set current config | payload `[profile & 1]`; re-applies settings after writes |
-| `0x16` / `0x17` | Set / get long-range mode | |
+| `0x16` / `0x17` | Set / get long-range mode | accepted, but `0x17` always reports off and the vendor app's "long distance" toggle does not use flash; not supported here |
 
 Battery voltage curve (mV at 0%, 5%, … 100%), from the vendor driver:
 `3050 3420 3480 3540 3600 3660 3720 3760 3800 3840 3880 3920 3940 3960 3980 4000 4020 4040 4060 4080 4110`.
@@ -68,6 +74,39 @@ Button slots on the M600 V2: 0 left, 1 right, 2 middle, 3 back, 4 forward,
 
 DPI encoding (50-DPI steps, 50–26 000): `raw = dpi / 50 - 1`; `x = y = raw & 0xFF`;
 for `raw > 0xFF`, `hi = raw >> 8` and `ex = (hi << 2) | (hi << 6)`.
+
+### Writing
+
+- **Settings (`0x0000`–`0x00BF`)** are applied immediately: a write can be read
+  back straight away. The firmware validates registers and silently keeps the old
+  value of a byte that would make a record invalid. Send `0x0F` afterwards so the
+  sensor picks up the change.
+- **Macros** are buffered: the firmware only commits a slot once a complete,
+  valid macro (correct checksum) has been written in order from the slot start.
+  Reads return the old contents until then, so verify once at the end, not per chunk.
+
+## Macros
+
+Slot `n` lives at `0x0300 + n * 384`. The vendor app stores the macro for button
+slot `n` in macro slot `n`.
+
+| Offset | Field |
+|---|---|
+| 0 | name length (1–30) |
+| 1–30 | ASCII name |
+| 31 | step count (≤ 70) |
+| 32 + 5·i | step `i`: `[event \| kind, code lo, code hi, delay hi, delay lo]` |
+| 32 + 5·count | checksum: `0x55 - (count + sum of step bytes)` |
+
+- `event`: `0x80` down, `0x40` up.
+- `kind`: `0x00` modifier (`code` is the HID modifier bitmask: 1 LCtrl, 2 LShift,
+  4 LAlt, 8 LWin, ×16 for right-hand keys), `0x01` key (`code` is the HID usage),
+  `0x04` mouse button (`code` mask: 1 left, 2 right, 4 middle, 8 back, 16 forward).
+- `delay`: milliseconds to wait after the step, big-endian.
+
+A button runs a macro with binding `[0x06, slot, mode]`, where `mode` is
+`1`–`250` (run N times), `0xFE` (repeat while held), `0xFF` (repeat until any key)
+or `0xFD` (repeat until the button is pressed again).
 
 Unknown registers still to identify: `0xA7`, `0xAD`, `0xB3`, `0xB7`, `0xBB`, `0xBD`
 (likely sleep / peak-performance timers).
