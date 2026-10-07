@@ -1,5 +1,5 @@
 {
-  "name": "m600-control",
+  "name": "openkysona",
   "version": "0.1.0",
   "private": true,
   "description": "Lightweight, offline WebHID configurator for the Kysona M600 V2 mouse",

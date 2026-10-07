@@ -12,7 +12,7 @@
       <rect x="5" y="2" width="14" height="20" rx="7" fill="none" stroke="var(--accent)" stroke-width="2" />
       <path d="M12 2v7" stroke="var(--accent)" stroke-width="2" />
     </svg>
-    <span>M600 Control</span>
+    <span>Open<b>Kysona</b></span>
   </div>
 
   {#if m.mouse}
@@ -41,6 +41,10 @@
     font-weight: 650;
     font-size: 16px;
     letter-spacing: -0.01em;
+  }
+  .brand b {
+    font-weight: inherit;
+    color: var(--accent);
   }
   .status {
     display: flex;

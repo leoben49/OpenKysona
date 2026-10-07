@@ -13,7 +13,7 @@
 
   {#if !m.supported}
     <h1>This browser can’t talk to USB devices</h1>
-    <p class="muted">M600 Control uses WebHID, available in Chrome, Edge, Brave and other Chromium browsers on desktop.</p>
+    <p class="muted">OpenKysona uses WebHID, available in Chrome, Edge, Brave and other Chromium browsers on desktop.</p>
   {:else}
     <h1>Connect your M600</h1>
     <p class="muted">

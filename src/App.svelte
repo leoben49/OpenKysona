@@ -17,7 +17,7 @@
   ] as const;
   type TabId = (typeof TABS)[number]['id'];
 
-  const TAB_KEY = 'm600.tab';
+  const TAB_KEY = 'openkysona.tab';
   let tab = $state<TabId>('performance');
   try {
     const saved = localStorage.getItem(TAB_KEY);

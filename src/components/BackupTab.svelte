@@ -11,9 +11,9 @@
   function exportBackup() {
     const bytes = m.snapshot();
     if (!bytes) return;
-    const data = { format: 'm600-control-backup', version: 1, device: 'Kysona M600 V2', created: new Date().toISOString(), settings: hex(bytes) };
+    const data = { format: 'openkysona-backup', version: 1, device: 'Kysona M600 V2', created: new Date().toISOString(), settings: hex(bytes) };
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-    const a = Object.assign(document.createElement('a'), { href: url, download: `m600-settings-${new Date().toISOString().slice(0, 10)}.json` });
+    const a = Object.assign(document.createElement('a'), { href: url, download: `openkysona-m600-${new Date().toISOString().slice(0, 10)}.json` });
     a.click();
     URL.revokeObjectURL(url);
     message = { ok: true, text: 'Backup downloaded.' };
@@ -27,7 +27,7 @@
       return bytes.slice(0, SETTINGS_LEN);
     }
     const data = JSON.parse(await file.text());
-    if (data?.format !== 'm600-control-backup' || typeof data.settings !== 'string') throw new Error('Not an M600 Control backup.');
+    if (data?.format !== 'openkysona-backup' || typeof data.settings !== 'string') throw new Error('Not an OpenKysona backup.');
     const bytes = Uint8Array.from(data.settings.split(' ').map((h: string) => parseInt(h, 16)));
     if (bytes.length !== SETTINGS_LEN || bytes.some(Number.isNaN)) throw new Error('Backup is damaged.');
     return bytes;
