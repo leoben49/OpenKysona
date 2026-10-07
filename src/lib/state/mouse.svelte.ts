@@ -25,6 +25,10 @@ class MouseState {
   private teardown: (() => void)[] = [];
 
   async restore() {
+    if (import.meta.env.DEV && new URLSearchParams(location.search).has('fake')) {
+      const { createFakeHid } = await import('../dev/fake-hid');
+      return this.attach(createFakeHid().then((hid) => Mouse.open(hid)));
+    }
     if (!this.supported) return;
     navigator.hid.addEventListener('disconnect', (e) => {
       if (e.device === this.mouse?.hid) this.disconnected();

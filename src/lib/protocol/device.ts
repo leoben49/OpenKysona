@@ -49,7 +49,7 @@ export class Mouse {
     return device ? Mouse.open(device) : null;
   }
 
-  private static async open(hid: HIDDevice): Promise<Mouse> {
+  static async open(hid: HIDDevice): Promise<Mouse> {
     if (!hid.opened) await hid.open();
     return new Mouse(hid);
   }

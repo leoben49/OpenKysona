@@ -15,10 +15,10 @@
   }: { button: number; buttonName: string; initial: Macro | null; initialRepeat: number; onclose: () => void } = $props();
 
   // The editor is re-created per button, so props only seed the draft.
-  const seed = untrack(() => ({ macro: initial, name: buttonName, repeat: initialRepeat }));
+  const seed = untrack(() => ({ macro: $state.snapshot(initial), name: buttonName, repeat: initialRepeat }));
 
   let name = $state(seed.macro?.name ?? `${seed.name} macro`);
-  let steps = $state<MacroStep[]>(structuredClone(seed.macro?.steps ?? []));
+  let steps = $state<MacroStep[]>(seed.macro?.steps ?? []);
   let recording = $state(false);
   let useRecordedDelays = $state(true);
   let fixedDelay = $state(20);

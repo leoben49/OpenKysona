@@ -63,7 +63,7 @@
     if (!undo) return;
     const u = undo;
     m.update((x) => {
-      x.dpiStages = structuredClone(u.stages);
+      x.dpiStages = $state.snapshot(u.stages);
       x.stageCount = u.count;
       x.activeStage = u.active;
     });
