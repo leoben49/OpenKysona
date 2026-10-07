@@ -1,5 +1,6 @@
 import type { Battery } from '../protocol/battery';
 import { Mouse } from '../protocol/device';
+import { decodeMacro, encodeMacro, MACRO_SLOT_SIZE, macroAddress, usedLength, type Macro } from '../protocol/macro';
 import { decodeSettings, encodeSettings, SETTINGS_LEN, type Settings } from '../protocol/settings';
 
 export type SyncState = 'idle' | 'saving' | 'saved' | 'error';
@@ -138,6 +139,32 @@ class MouseState {
     } catch (e) {
       this.fail(e);
     }
+  }
+
+  /** Reads the macro stored in `slot` (null if empty). */
+  async loadMacro(slot: number): Promise<Macro | null> {
+    if (!this.mouse) return null;
+    return decodeMacro(await this.mouse.readFlash(macroAddress(slot), MACRO_SLOT_SIZE));
+  }
+
+  /**
+   * Stores `macro` in the macro slot matching the button (as the vendor app
+   * does) and binds the button to it with the given repeat mode.
+   */
+  async saveMacro(button: number, macro: Macro, repeat: number) {
+    if (!this.mouse || !this.settings) return;
+    this.sync = 'saving';
+    try {
+      const addr = macroAddress(button);
+      const current = await this.mouse.readFlash(addr, MACRO_SLOT_SIZE);
+      const used = usedLength(macro);
+      await this.mouse.writeFlashDiff(addr, encodeMacro(macro, current).subarray(0, used), current.subarray(0, used));
+      this.sync = 'saved';
+    } catch (e) {
+      this.fail(e);
+      throw e;
+    }
+    this.update((s) => (s.buttons[button] = { type: 'macro', index: button, mode: repeat }));
   }
 
   /** Current on-device settings bytes, for backups. */

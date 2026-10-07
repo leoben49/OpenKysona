@@ -1,7 +1,9 @@
 <script lang="ts">
   import { mouseState } from '../lib/state/mouse.svelte';
   import type { ButtonAction } from '../lib/protocol/settings';
+  import type { Macro } from '../lib/protocol/macro';
   import Card from './ui/Card.svelte';
+  import MacroEditor from './MacroEditor.svelte';
 
   const m = mouseState;
   const s = $derived(m.settings!);
@@ -55,11 +57,11 @@
   const ALL = ACTIONS.flatMap((g) => g.items);
 
   function keyOf(a: ButtonAction): string {
+    if (a.type === 'macro') return 'macro';
     return ALL.find((i) => JSON.stringify(i.action) === JSON.stringify(a))?.key ?? 'custom';
   }
 
   function describeCustom(a: ButtonAction): string {
-    if (a.type === 'macro') return `Macro ${a.index + 1}`;
     if (a.type === 'fire') return 'Rapid fire';
     if (a.type === 'shortcut') return 'Keyboard shortcut';
     return 'Custom';
@@ -67,13 +69,46 @@
 
   let hovered = $state<string | null>(null);
 
+  // ---- macros ----------------------------------------------------------------
+
+  /** Names of macros currently bound to buttons, keyed by macro slot. */
+  let macroNames = $state<Record<number, string>>({});
+  let editor = $state<{ button: number; name: string; macro: Macro | null; repeat: number } | null>(null);
+
+  $effect(() => {
+    for (const b of BUTTONS) {
+      const a = s.buttons[b.slot];
+      if (a.type === 'macro' && !(a.index in macroNames)) {
+        macroNames[a.index] = '…';
+        m.loadMacro(a.index).then((mac) => (macroNames[a.index] = mac?.name ?? 'Empty macro'));
+      }
+    }
+  });
+
+  async function openEditor(button: number, name: string) {
+    const a = s.buttons[button];
+    const macro = a.type === 'macro' ? await m.loadMacro(a.index) : null;
+    editor = { button, name, macro, repeat: a.type === 'macro' ? a.mode : 1 };
+  }
+
+  function closeEditor() {
+    if (editor) delete macroNames[editor.button];
+    editor = null;
+  }
+
   function assign(slot: number, select: HTMLSelectElement) {
+    const restoreSelect = () => (select.value = keyOf(s.buttons[slot]) === 'macro' ? 'macro-current' : keyOf(s.buttons[slot]));
+    if (select.value === 'macro') {
+      restoreSelect();
+      void openEditor(slot, BUTTONS.find((b) => b.slot === slot)!.name);
+      return;
+    }
     const action = ALL.find((i) => i.key === select.value)?.action;
     if (!action) return;
     const after = s.buttons.map((b, i) => (i === slot ? action : b));
     const hasLeft = BUTTONS.some((b) => keyOf(after[b.slot]) === 'left');
     if (!hasLeft && !confirm('No button will left-click after this change. Continue?')) {
-      select.value = keyOf(s.buttons[slot]);
+      restoreSelect();
       return;
     }
     m.update((x) => (x.buttons[slot] = structuredClone(action)));
@@ -113,9 +148,13 @@
         {@const key = keyOf(current)}
         <li onmouseenter={() => (hovered = b.part)} onmouseleave={() => (hovered = null)}>
           <label for="btn-{b.slot}">{b.name}</label>
+          <span class="spacer"></span>
+          {#if current.type === 'macro'}
+            <button class="btn small" onclick={() => openEditor(b.slot, b.name)}>Edit</button>
+          {/if}
           <select
             id="btn-{b.slot}"
-            value={key}
+            value={key === 'macro' ? 'macro-current' : key}
             onfocus={() => (hovered = b.part)}
             onblur={() => (hovered = null)}
             onchange={(e) => assign(b.slot, e.currentTarget)}>
@@ -125,12 +164,31 @@
                 {#each g.items as i (i.key)}<option value={i.key}>{i.label}</option>{/each}
               </optgroup>
             {/each}
+            <optgroup label="Macro">
+              {#if current.type === 'macro'}
+                <option value="macro-current" hidden>Macro: {macroNames[current.index] ?? '…'}</option>
+              {/if}
+              <option value="macro">{current.type === 'macro' ? 'Edit macro…' : 'Record a macro…'}</option>
+            </optgroup>
           </select>
         </li>
       {/each}
     </ul>
   </div>
 </Card>
+
+{#if editor}
+  {#key editor.button}
+    <div class="editor">
+      <MacroEditor
+        button={editor.button}
+        buttonName={editor.name}
+        initial={editor.macro}
+        initialRepeat={editor.repeat}
+        onclose={closeEditor} />
+    </div>
+  {/key}
+{/if}
 
 <style>
   .layout {
@@ -162,11 +220,21 @@
     margin: 0;
     padding: 0;
   }
+  .spacer {
+    flex: 1;
+  }
+  .btn.small {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+  .editor {
+    margin-top: 16px;
+  }
   li {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+    gap: 10px;
     padding: 10px 0;
     border-top: 1px solid var(--border);
   }

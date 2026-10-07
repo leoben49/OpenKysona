@@ -79,6 +79,8 @@ export class Mouse {
           if (e.reportId !== REPORT_ID) return;
           const p = new Uint8Array(e.data.buffer, e.data.byteOffset, e.data.byteLength).slice(0, 16);
           if (p[0] !== cmd) return;
+          // Flash replies echo the address; ignore replies to another app's requests.
+          if ((cmd === Command.ReadFlash || cmd === Command.WriteFlash) && ((p[2] << 8) | p[3]) !== addr) return;
           cleanup();
           isValid(p) ? resolve(p) : reject(new Error(`bad checksum on response to 0x${cmd.toString(16)}`));
         };

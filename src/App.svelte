@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, type Component } from 'svelte';
   import { mouseState } from './lib/state/mouse.svelte';
   import Header from './components/Header.svelte';
   import ConnectScreen from './components/ConnectScreen.svelte';
@@ -33,9 +33,22 @@
 
   const Current = $derived(TABS.find((t) => t.id === tab)!.component);
 
+  // Dev-server-only tooling; excluded from production builds.
+  let DevPanel = $state<Component | null>(null);
+
   onMount(() => {
     void m.restore();
-    if (import.meta.env.DEV) void import('./lib/dev/devtools').then((d) => d.start());
+    if (import.meta.env.DEV) {
+      void import('./lib/dev/devtools').then(async (d) => {
+        d.start();
+        try {
+          DevPanel = (await import('./lib/dev/DevPanel.svelte')).default;
+          d.devlog({ step: 'devpanel', ok: true });
+        } catch (e) {
+          d.devlog({ step: 'devpanel', ok: false, error: String(e) });
+        }
+      });
+    }
   });
 </script>
 
@@ -60,6 +73,8 @@
     </main>
   {/if}
 </div>
+
+{#if DevPanel}<DevPanel />{/if}
 
 <style>
   .shell {
