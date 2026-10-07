@@ -175,6 +175,24 @@ export class Mouse {
   }
 
   /**
+   * Writes a macro slot. Unlike settings, the firmware buffers macro writes and
+   * only commits them once a complete, valid macro has arrived, so the bytes
+   * are sent in order from the slot start and verified once at the end.
+   */
+  async writeMacroSlot(addr: number, bytes: Uint8Array) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      for (let off = 0; off < bytes.length; off += MAX_PAYLOAD) {
+        const chunk = bytes.subarray(off, Math.min(bytes.length, off + MAX_PAYLOAD));
+        await this.requestRetry(Command.WriteFlash, addr + off, chunk.length, chunk);
+      }
+      await sleep(50);
+      const back = await this.readFlash(addr, bytes.length);
+      if (back.every((b, i) => b === bytes[i])) return;
+    }
+    throw new Error(`macro write rejected at 0x${addr.toString(16).padStart(4, '0')}`);
+  }
+
+  /**
    * Retries timeouts, which happen when a packet is lost over 2.4 GHz or the
    * mouse has gone to sleep; a heartbeat between attempts wakes the link.
    */

@@ -159,10 +159,8 @@ class MouseState {
     if (!this.mouse || !this.settings) return;
     this.sync = 'saving';
     try {
-      const addr = macroAddress(button);
-      const current = await this.mouse.readFlash(addr, MACRO_SLOT_SIZE);
-      const used = usedLength(macro);
-      await this.mouse.writeFlashDiff(addr, encodeMacro(macro, current).subarray(0, used), current.subarray(0, used));
+      const encoded = encodeMacro(macro);
+      await this.mouse.writeMacroSlot(macroAddress(button), encoded.subarray(0, usedLength(macro)));
       this.sync = 'saved';
     } catch (e) {
       this.fail(e);
