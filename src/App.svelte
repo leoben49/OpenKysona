@@ -3,6 +3,7 @@
   import { mouseState } from './lib/state/mouse.svelte';
   import Header from './components/Header.svelte';
   import ConnectScreen from './components/ConnectScreen.svelte';
+  import OfflineScreen from './components/OfflineScreen.svelte';
   import PerformanceTab from './components/PerformanceTab.svelte';
   import SensorTab from './components/SensorTab.svelte';
   import ButtonsTab from './components/ButtonsTab.svelte';
@@ -57,6 +58,8 @@
 
   {#if !m.mouse}
     <ConnectScreen />
+  {:else if !m.online}
+    <OfflineScreen />
   {:else if !m.settings}
     <p class="loading muted">Reading settings…</p>
   {:else}

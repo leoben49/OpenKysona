@@ -15,7 +15,7 @@
     <span>Open<b>Kysona</b></span>
   </div>
 
-  {#if m.mouse}
+  {#if m.mouse && m.online}
     <div class="status">
       <span class="sync {m.sync}" aria-live="polite">
         {#if m.sync === 'saving'}Saving…{:else if m.sync === 'saved'}Saved{:else if m.sync === 'error'}Not saved{/if}

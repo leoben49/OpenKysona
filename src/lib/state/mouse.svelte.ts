@@ -6,11 +6,14 @@ import { decodeSettings, encodeSettings, SETTINGS_LEN, type Settings } from '../
 export type SyncState = 'idle' | 'saving' | 'saved' | 'error';
 
 const BATTERY_POLL_MS = 60_000;
+const ONLINE_POLL_MS = 3_000;
 const SAVE_DEBOUNCE_MS = 250;
 
 /** App-wide connection, battery and settings state, kept in sync with the mouse. */
 class MouseState {
   mouse = $state<Mouse | null>(null);
+  /** False when connected to the receiver but the mouse isn't reachable through it. */
+  online = $state(false);
   battery = $state<Battery | null>(null);
   settings = $state<Settings | null>(null);
   sync = $state<SyncState>('idle');
@@ -31,17 +34,27 @@ class MouseState {
     }
     if (!this.supported) return;
     navigator.hid.addEventListener('disconnect', (e) => {
-      if (e.device === this.mouse?.hid) this.disconnected();
+      if (e.device !== this.mouse?.hid) return;
+      this.detach();
+      void this.attach(Mouse.fromGranted()); // e.g. cable unplugged: fall back to the receiver
     });
     navigator.hid.addEventListener('connect', () => {
-      if (!this.mouse) void this.attach(Mouse.fromGranted());
+      // Prefer a cable over the receiver as soon as one is plugged in.
+      if (!this.mouse || this.mouse.link === 'dongle') void this.switchTo(Mouse.fromGranted());
     });
     await this.attach(Mouse.fromGranted());
   }
 
   /** Must be called from a click handler (opens the browser's device picker). */
   async connect() {
-    await this.attach(Mouse.request());
+    await this.switchTo(Mouse.request());
+  }
+
+  private async switchTo(pending: Promise<Mouse | null>) {
+    const m = await pending.catch(() => null);
+    if (!m || m.hid === this.mouse?.hid) return;
+    this.detach();
+    await this.attach(Promise.resolve(m));
   }
 
   private async attach(pending: Promise<Mouse | null>) {
@@ -51,8 +64,12 @@ class MouseState {
       this.mouse = m;
       this.error = null;
       await m.hello().catch(() => {});
-      await Promise.all([this.refreshSettings(), this.refreshBattery()]);
-      const poll = setInterval(() => document.visibilityState === 'visible' && this.refreshBattery(), BATTERY_POLL_MS);
+      const poll = setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        // While the receiver can't see the mouse, check often so it reconnects quickly.
+        if (!this.online) void this.checkOnline();
+        else if (Date.now() - this.lastBattery > BATTERY_POLL_MS) void this.refreshBattery();
+      }, ONLINE_POLL_MS);
       const unsubscribe = m.onStatus((flags) => {
         if (flags & 0x40) void this.refreshBattery();
         if (flags & 0x07 && !this.saving) void this.refreshSettings();
@@ -60,28 +77,46 @@ class MouseState {
       const onVisible = () => document.visibilityState === 'visible' && this.refreshBattery();
       document.addEventListener('visibilitychange', onVisible);
       this.teardown = [() => clearInterval(poll), unsubscribe, () => document.removeEventListener('visibilitychange', onVisible)];
+      await this.checkOnline();
     } catch (e) {
       this.fail(e);
     }
   }
 
-  private disconnected() {
+  /** Over the receiver, the mouse may be off, asleep or on another connection mode. */
+  private async checkOnline() {
+    const m = this.mouse;
+    if (!m) return;
+    const online = m.link === 'wired' || (await m.online().catch(() => false));
+    if (m !== this.mouse) return;
+    const cameOnline = online && !this.online;
+    this.online = online;
+    if (cameOnline || (online && !this.settings)) await Promise.all([this.refreshSettings(), this.refreshBattery()]);
+  }
+
+  private detach() {
     this.teardown.forEach((f) => f());
     this.teardown = [];
     clearTimeout(this.saveTimer);
     this.mouse = null;
+    this.online = false;
     this.battery = null;
     this.settings = null;
     this.raw = null;
     this.sync = 'idle';
   }
 
+  private lastBattery = 0;
+
   async refreshBattery() {
     if (!this.mouse) return;
+    this.lastBattery = Date.now();
     try {
       this.battery = await this.mouse.battery();
     } catch {
-      // Mouse asleep or out of range; keep the last known value.
+      // Asleep, out of range, or switched to another mode: find out which.
+      const m = this.mouse;
+      if (m?.link === 'dongle' && !(await m.online().catch(() => false)) && m === this.mouse) this.online = false;
     }
   }
 
