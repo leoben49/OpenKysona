@@ -48,6 +48,34 @@ set still applies there, and Windows shows the battery level under
 telemetry or update check, and a Content Security Policy blocks connections to
 other sites.
 
+### Platforms
+
+| Platform | Status |
+|---|---|
+| Windows | Tested (Brave) |
+| macOS | Should work in Chrome, Edge or Brave with no setup, but hasn't been tested yet |
+| Linux | Works in Chromium-based browsers after a one-time permission rule (below); not tested yet |
+| ChromeOS | Should work, untested |
+| Firefox, Safari, phones | Not supported (no WebHID) |
+
+#### Linux setup
+
+Linux only lets root access raw HID devices by default, so the browser can't
+see the mouse until you add a udev rule. Run this once:
+
+```bash
+echo 'KERNEL=="hidraw*", ATTRS{idVendor}=="3554", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/70-openkysona.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+Then unplug and replug the receiver or cable. The rule gives the logged-in user
+access to devices from vendor `3554` (Compx, the chip maker used by Kysona) and
+nothing else.
+
+If you use Chrome or Chromium installed as a **Snap** or **Flatpak**, the sandbox
+may still block access. A browser installed from your distribution's own
+packages or from the vendor's `.deb`/`.rpm` avoids this.
+
 ## Supported devices
 
 | Device | Status |
