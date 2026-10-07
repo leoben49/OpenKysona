@@ -115,12 +115,12 @@ export class Mouse {
   }
 
   async currentProfile(): Promise<number> {
-    return payloadOf(await this.request(Command.GetCurrentConfig))[0];
+    return payloadOf(await this.requestRetry(Command.GetCurrentConfig))[0];
   }
 
   /** Makes the firmware re-apply settings from flash after writes. */
   async reload(profile: number) {
-    await this.request(Command.SetCurrentConfig, 0, 1, [profile & 0x01]);
+    await this.requestRetry(Command.SetCurrentConfig, 0, 1, [profile & 0x01]);
     await sleep(60);
   }
 
@@ -137,7 +137,7 @@ export class Mouse {
   private async writeChunk(addr: number, bytes: Uint8Array) {
     for (let attempt = 1; attempt <= 4; attempt++) {
       try {
-        await this.request(Command.WriteFlash, addr, bytes.length, bytes);
+        await this.requestRetry(Command.WriteFlash, addr, bytes.length, bytes, 2);
         await sleep(15);
         const back = await this.readFlash(addr, bytes.length);
         if (back.every((b, i) => b === bytes[i])) return;
@@ -172,13 +172,17 @@ export class Mouse {
     return written;
   }
 
-  /** Retries timeouts, which happen occasionally over the 2.4 GHz link. */
+  /**
+   * Retries timeouts, which happen when a packet is lost over 2.4 GHz or the
+   * mouse has gone to sleep; a heartbeat between attempts wakes the link.
+   */
   async requestRetry(cmd: Command, addr = 0, len = 0, payload: ArrayLike<number> = [], attempts = 4) {
     for (let i = 1; ; i++) {
       try {
         return await this.request(cmd, addr, len, payload);
       } catch (e) {
         if (!(e instanceof TimeoutError) || i >= attempts) throw e;
+        if (cmd !== Command.PcDriverStatus) await this.hello().catch(() => {});
       }
     }
   }

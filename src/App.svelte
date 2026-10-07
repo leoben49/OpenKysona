@@ -71,8 +71,7 @@
     display: flex;
     gap: 4px;
     margin: 8px 0 20px;
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
+    box-shadow: inset 0 -1px var(--border);
   }
   .tabs button {
     position: relative;
@@ -94,7 +93,7 @@
     position: absolute;
     left: 10px;
     right: 10px;
-    bottom: -1px;
+    bottom: 0;
     height: 2px;
     border-radius: 1px;
     background: var(--accent);

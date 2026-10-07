@@ -26,17 +26,29 @@
     m.update((x) => (x.dpiStages[editing].dpi = clampDpi(dpi)));
   }
 
+  /** Stage colours used by the vendor app, reused for newly added stages. */
+  const DEFAULT_COLORS = ['#ff8000', '#ff0000', '#00ff00', '#0000ff', '#00ffff', '#ff00ff', '#ffffff', '#ff557d'];
+
   function addStage() {
     m.update((x) => {
-      const last = x.dpiStages[x.stageCount - 1].dpi;
-      x.dpiStages[x.stageCount].dpi = clampDpi(Math.min(DPI_MAX, last * 2));
+      const i = x.stageCount;
+      x.dpiStages[i] = { dpi: clampDpi(Math.min(DPI_MAX, x.dpiStages[i - 1].dpi * 2)), color: DEFAULT_COLORS[i] };
       x.stageCount++;
     });
     selected = s.stageCount - 1;
+    undo = null;
   }
+
+  // Removing a stage can be undone for a few seconds.
+  type Saved = { stages: typeof s.dpiStages; count: number; active: number; index: number };
+  let undo = $state<Saved | null>(null);
+  let undoTimer: ReturnType<typeof setTimeout> | undefined;
 
   function removeStage() {
     const i = editing;
+    undo = { stages: $state.snapshot(s.dpiStages), count: s.stageCount, active: s.activeStage, index: i };
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(() => (undo = null), 8000);
     m.update((x) => {
       // Shift later stages down and park the removed one at the end.
       const [removed] = x.dpiStages.splice(i, 1);
@@ -47,11 +59,42 @@
     selected = Math.min(i, s.stageCount - 1);
   }
 
+  function undoRemove() {
+    if (!undo) return;
+    const u = undo;
+    m.update((x) => {
+      x.dpiStages = structuredClone(u.stages);
+      x.stageCount = u.count;
+      x.activeStage = u.active;
+    });
+    selected = u.index;
+    undo = null;
+  }
+
+  const sorted = $derived(s.dpiStages.slice(0, s.stageCount).every((st, i, a) => i === 0 || a[i - 1].dpi <= st.dpi));
+
+  function sortStages() {
+    m.update((x) => {
+      const stages = $state.snapshot(x.dpiStages);
+      const order = stages
+        .slice(0, x.stageCount)
+        .map((_, i) => i)
+        .sort((a, b) => stages[a].dpi - stages[b].dpi);
+      x.activeStage = order.indexOf(x.activeStage);
+      x.dpiStages = [...order.map((i) => stages[i]), ...stages.slice(x.stageCount)];
+    });
+    selected = null;
+    undo = null;
+  }
+
   const fmt = (n: number) => n.toLocaleString('en-US');
 </script>
 
 <div class="stack">
-  <Card title="DPI stages" subtitle="The DPI button on your mouse cycles through these. Click a stage to switch to it.">
+  <Card title="DPI stages" subtitle="The DPI button on your mouse cycles through these, in this order. Click a stage to switch to it.">
+    {#snippet actions()}
+      <button class="btn" onclick={sortStages} disabled={sorted} title="Order stages from lowest to highest DPI">Sort</button>
+    {/snippet}
     <div class="stages" style:--n={Math.min(MAX_STAGES, s.stageCount + (s.stageCount < MAX_STAGES ? 1 : 0))}>
       {#each s.dpiStages.slice(0, s.stageCount) as st, i (i)}
         <button class="stage" class:active={i === s.activeStage} class:editing={i === editing} onclick={() => choose(i)}>
@@ -101,6 +144,13 @@
         aria-label="DPI slider" />
       <div class="scale muted"><span>{fmt(DPI_MIN)}</span><span>{fmt(DPI_MAX)}</span></div>
     </div>
+
+    {#if undo}
+      <div class="undo" role="status">
+        <span>Stage {undo.index + 1} ({fmt(undo.stages[undo.index].dpi)} DPI) removed</span>
+        <button class="btn" onclick={undoRemove}>Undo</button>
+      </div>
+    {/if}
   </Card>
 
   <Card title="Polling rate" subtitle="How often the mouse reports its position. Higher is smoother but uses more battery.">
@@ -249,6 +299,25 @@
   .btn.ghost:hover:not(:disabled) {
     color: var(--bad);
     background: var(--surface-2);
+  }
+  .undo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 8px 8px 8px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 13px;
+    animation: rise 0.2s var(--ease);
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
   }
   .scale {
     display: flex;
